@@ -34,7 +34,7 @@ void loop() {
   rate = Dmx.getChannel(16);  
 
   if ( rate != rate_bak ){
-    t.update(map(rate, 0, 255, 1000000, 150000));
+    t.update(map(rate, 0, 255, 1000000, 20000));
     rate_bak = rate;
   }
 
