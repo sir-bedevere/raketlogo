@@ -1,25 +1,11 @@
 #include <TeensyDmx.h>
 #include <WS2812Serial.h>
 
-#define DMX_REDE 2      // MAX485 PINS
-#define CHANNEL 0       // DMX Start channel
-#define NUMCHANNELS 3   // Num channels per strip
+#define DMX_REDE 2
+#define CHANNEL 0
 
-#define LED_PIN 5       // Output to pixel
-#define NUM_LED 751      // Total number of Leds
-#define NUMSTRANDS 15   // Controllable pieces per strand
-#define STRANDSIZE 100  // Leds per piece
-
-// STROBE + CHANNEL
-
-int ledArray[NUMSTRANDS][STRANDSIZE] = {
-  { 0, 1 },
-  { 62, 63, 64, 65 }  
-};
-
-
-int backupColor[NUMSTRANDS];
-
+#define LED_PIN 5
+#define NUM_LED 751
 
 byte drawingMemory[NUM_LED*3];         //  3 bytes per LED
 DMAMEM byte displayMemory[NUM_LED*12]; // 12 bytes per LED
@@ -27,44 +13,76 @@ DMAMEM byte displayMemory[NUM_LED*12]; // 12 bytes per LED
 TeensyDmx Dmx(Serial2, DMX_REDE);
 WS2812Serial leds(NUM_LED, displayMemory, drawingMemory, LED_PIN, WS2812_GRB);
 
+IntervalTimer t;
+
 void setup() {
-  Serial.begin(9600);
+  t.begin(shutter, 150000);
   leds.begin();
   Dmx.setMode(TeensyDmx::DMX_IN);
 }
 
-uint32_t c = 0x00FF00;
-uint32_t c_bak;
+uint32_t c[5];
+uint32_t c_bak[5];
 
-uint32_t c_driehoek = 0xFF0000;
-uint32_t c_logo = 0x00FF00;
-uint32_t c_cirkels = 0x0000FF;
+uint8_t rate, rate_bak;
 
-volatile uint8_t *dmxBuf;
-
+volatile boolean shutterOn;
 
 void loop() {
-
-
-  driehoek(0xFF0000);
-  driehoek_logo(0xFF00FF);
-  cirkels(0x0000FF);
-  logo(0x00FF00);
-  rest(0xffff00);
-  leds.show();
-  delay(1000);
-  /*
-
   Dmx.loop();
+  
+  rate = Dmx.getChannel(16);  
 
-  c = getRGB(0);
-
-  if ( c != c_bak ){  
-    setPixels(c, 0, 750 );
-    leds.show(); 
-    c_bak = c; 
+  if ( rate != rate_bak ){
+    t.update(map(rate, 0, 255, 1000000, 150000));
+    rate_bak = rate;
   }
-  */
+
+  for ( int i=0; i<=4; i++){
+    if ( shutterOn ){
+      c[i] = getRGB(i*3);  
+    } else{
+      c[i] = 0;  
+    }
+  }
+  
+  if ( c[0] != c_bak[0] ){
+    driehoek(c[0]);
+    leds.show(); 
+    c_bak[0] = c[0]; 
+  }
+  
+  if ( c[1] != c_bak[1] ){
+    logo(c[1]);
+    leds.show(); 
+    c_bak[1] = c[1]; 
+  }
+  
+  if ( c[2] != c_bak[2] ){
+    driehoek_logo(c[2]);
+    leds.show(); 
+    c_bak[2] = c[2]; 
+  }
+  
+  if ( c[3] != c_bak[3] ){
+    cirkels(c[3]);
+    leds.show(); 
+    c_bak[3] = c[3]; 
+  }
+  
+  if ( c[4] != c_bak[4] ){
+    rest(c[4]);
+    leds.show(); 
+    c_bak[4] = c[4]; 
+  }
+}
+
+void shutter(){
+  if ( rate == 0 ){
+    shutterOn = true;  
+  } else{
+    shutterOn = not shutterOn;
+  }
 }
 
 void driehoek(uint32_t color){
